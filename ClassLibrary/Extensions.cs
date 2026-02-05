@@ -26,15 +26,7 @@ namespace ExtensionMethods
         public static int CountValue<T>(this T[] array, T value) where T : IEquatable<T>
         {
             if (array == null) return 0;
-            int count = 0;
-            foreach (var item in array)
-            {
-                if (item.Equals(value))
-                {
-                    count++;
-                }
-            }
-            return count;
+            return array.Count(item => item.Equals(value));
         }
 
         public static T[] GetUniqueElements<T>(this T[] array)
