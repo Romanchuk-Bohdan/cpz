@@ -7,7 +7,7 @@ namespace GenericCollections
 {
     public class ExtendedDictionaryElement<T, U, V>
     {
-        public T Key { get; set; }
+        public T Key { get; }
         public U Value1 { get; set; }
         public V Value2 { get; set; }
 
