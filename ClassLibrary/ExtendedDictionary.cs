@@ -21,42 +21,37 @@ namespace GenericCollections
 
     public class ExtendedDictionary<T, U, V> : IEnumerable<ExtendedDictionaryElement<T, U, V>>
     {
-        private List<ExtendedDictionaryElement<T, U, V>> _elements;
+        private Dictionary<T, ExtendedDictionaryElement<T, U, V>> _elements;
 
         public ExtendedDictionary()
         {
-            _elements = new List<ExtendedDictionaryElement<T, U, V>>();
+            _elements = new Dictionary<T, ExtendedDictionaryElement<T, U, V>>();
         }
 
         public int Count => _elements.Count;
 
         public void Add(T key, U value1, V value2)
         {
-            if (ContainsKey(key))
+            if (_elements.ContainsKey(key))
             {
                 throw new ArgumentException($"Element with key {key} already exists.");
             }
-            _elements.Add(new ExtendedDictionaryElement<T, U, V>(key, value1, value2));
+            _elements.Add(key, new ExtendedDictionaryElement<T, U, V>(key, value1, value2));
         }
 
         public bool Remove(T key)
         {
-            var item = _elements.FirstOrDefault(e => EqualityComparer<T>.Default.Equals(e.Key, key));
-            if (item != null)
-            {
-                return _elements.Remove(item);
-            }
-            return false;
+            return _elements.Remove(key);
         }
 
         public bool ContainsKey(T key)
         {
-            return _elements.Any(e => EqualityComparer<T>.Default.Equals(e.Key, key));
+            return _elements.ContainsKey(key);
         }
 
         public bool ContainsValues(U value1, V value2)
         {
-            return _elements.Any(e =>
+            return _elements.Values.Any(e =>
                 EqualityComparer<U>.Default.Equals(e.Value1, value1) &&
                 EqualityComparer<V>.Default.Equals(e.Value2, value2));
         }
@@ -65,18 +60,17 @@ namespace GenericCollections
         {
             get
             {
-                var item = _elements.FirstOrDefault(e => EqualityComparer<T>.Default.Equals(e.Key, key));
-                if (item == null)
+                if (!_elements.ContainsKey(key))
                 {
                     throw new KeyNotFoundException($"Key {key} not found.");
                 }
-                return item;
+                return _elements[key];
             }
         }
 
         public IEnumerator<ExtendedDictionaryElement<T, U, V>> GetEnumerator()
         {
-            return _elements.GetEnumerator();
+            return _elements.Values.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
