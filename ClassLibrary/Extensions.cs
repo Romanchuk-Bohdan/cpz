@@ -23,10 +23,10 @@ namespace ExtensionMethods
 
     public static class ArrayExtensions
     {
-        public static int CountValue<T>(this T[] array, T value) where T : IEquatable<T>
+        public static int CountValue<T>(this T[] array, T value)
         {
             if (array == null) return 0;
-            return array.Count(item => item.Equals(value));
+            return array.Count(item => EqualityComparer<T>.Default.Equals(item, value));
         }
 
         public static T[] GetUniqueElements<T>(this T[] array)
