@@ -18,6 +18,18 @@ public abstract class LightNode
 {
     public abstract string OuterHTML { get; }
     public abstract string InnerHTML { get; }
+
+    public virtual void OnCreated() { }
+    public virtual void OnInserted() { }
+    public virtual void OnRendered() { }
+
+    public string Render()
+    {
+        OnCreated();
+        string result = OuterHTML;
+        OnRendered();
+        return result;
+    }
 }
 
 public class LightTextNode : LightNode
@@ -27,10 +39,21 @@ public class LightTextNode : LightNode
     public LightTextNode(string text)
     {
         _text = text;
+        OnCreated();
     }
 
     public override string OuterHTML => _text;
     public override string InnerHTML => _text;
+
+    public override void OnCreated()
+    {
+        Console.WriteLine("Створено текстовий вузол.");
+    }
+
+    public override void OnInserted()
+    {
+        Console.WriteLine("Текстовий вузол додано до дерева.");
+    }
 }
 
 public class LightElementNode : LightNode
@@ -48,6 +71,7 @@ public class LightElementNode : LightNode
         _closingType = closingType;
         _cssClasses = new List<string>();
         _children = new List<LightNode>();
+        OnCreated();
     }
 
     public void AddClass(string className)
@@ -58,6 +82,7 @@ public class LightElementNode : LightNode
     public void AddChild(LightNode node)
     {
         _children.Add(node);
+        node.OnInserted();
     }
 
     public int ChildrenCount => _children.Count;
@@ -98,6 +123,16 @@ public class LightElementNode : LightNode
             return sb.ToString();
         }
     }
+
+    public override void OnCreated()
+    {
+        Console.WriteLine($"Створено елемент: {_tagName}");
+    }
+
+    public override void OnRendered()
+    {
+        Console.WriteLine($"Відрендерено елемент: {_tagName}");
+    }
 }
 
 class Program
@@ -109,43 +144,14 @@ class Program
         
         LightElementNode div = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
         div.AddClass("container");
-        div.AddClass("dark-theme");
 
         LightElementNode h1 = new LightElementNode("h1", DisplayType.Block, ClosingType.Paired);
         h1.AddChild(new LightTextNode("Мова розмітки LightHTML"));
 
-        LightElementNode hr = new LightElementNode("hr", DisplayType.Block, ClosingType.Single);
-
-        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
-        ul.AddClass("list-group");
-
-        for (int i = 1; i <= 3; i++)
-        {
-            LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
-            li.AddClass("list-item");
-            li.AddChild(new LightTextNode($"Елемент списку {i} "));
-
-            if (i == 2)
-            {
-                LightElementNode strong = new LightElementNode("strong", DisplayType.Inline, ClosingType.Paired);
-                strong.AddClass("highlight");
-                strong.AddChild(new LightTextNode("(Важливий)"));
-                li.AddChild(strong);
-            }
-
-            ul.AddChild(li);
-        }
-
         div.AddChild(h1);
-        div.AddChild(hr);
-        div.AddChild(ul);
 
-        Console.WriteLine("--- InnerHTML головного контейнера ---\n");
-        Console.WriteLine(div.InnerHTML);
-        
-        Console.WriteLine("\n--- OuterHTML головного контейнера ---\n");
-        Console.WriteLine(div.OuterHTML);
-        
-        Console.WriteLine($"\nКількість прямих дочірніх елементів у div: {div.ChildrenCount}");
+        Console.WriteLine("\n--- Рендеринг головного контейнера ---");
+        string result = div.Render();
+        Console.WriteLine("\n" + result);
     }
 }
