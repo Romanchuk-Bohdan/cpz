@@ -2,51 +2,56 @@
 using System.Collections.Generic;
 using System.Text;
 
-public interface ICommand
+public interface INodeState
 {
-    void Execute();
-    void Undo();
+    string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType);
 }
 
-public class AddChildCommand : ICommand
+public class VisibleState : INodeState
 {
-    private readonly LightElementNode _parent;
-    private readonly LightNode _child;
-
-    public AddChildCommand(LightElementNode parent, LightNode child)
+    public string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType)
     {
-        _parent = parent;
-        _child = child;
-    }
+        StringBuilder sb = new StringBuilder();
+        sb.Append("<").Append(tagName);
 
-    public void Execute()
-    {
-        _parent.AddChild(_child);
-    }
-
-    public void Undo()
-    {
-        _parent.RemoveChild(_child);
-    }
-}
-
-public class CommandInvoker
-{
-    private readonly Stack<ICommand> _history = new Stack<ICommand>();
-
-    public void ExecuteCommand(ICommand command)
-    {
-        command.Execute();
-        _history.Push(command);
-    }
-
-    public void UndoCommand()
-    {
-        if (_history.Count > 0)
+        if (!string.IsNullOrEmpty(classes))
         {
-            var command = _history.Pop();
-            command.Undo();
+            sb.Append(" class=\"").Append(classes).Append("\"");
         }
+
+        sb.Append(">");
+
+        if (closingType == ClosingType.Paired)
+        {
+            sb.Append(innerHtml);
+            sb.Append("</").Append(tagName).Append(">");
+        }
+
+        return sb.ToString();
+    }
+}
+
+public class HiddenState : INodeState
+{
+    public string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.Append("<").Append(tagName);
+
+        if (!string.IsNullOrEmpty(classes))
+        {
+            sb.Append(" class=\"").Append(classes).Append("\"");
+        }
+
+        sb.Append(" style=\"display: none;\">");
+
+        if (closingType == ClosingType.Paired)
+        {
+            sb.Append(innerHtml);
+            sb.Append("</").Append(tagName).Append(">");
+        }
+
+        return sb.ToString();
     }
 }
 
@@ -88,6 +93,7 @@ public class LightElementNode : LightNode
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
     private readonly List<LightNode> _children;
+    private INodeState _state;
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
@@ -96,6 +102,12 @@ public class LightElementNode : LightNode
         _closingType = closingType;
         _cssClasses = new List<string>();
         _children = new List<LightNode>();
+        _state = new VisibleState();
+    }
+
+    public void SetState(INodeState state)
+    {
+        _state = state;
     }
 
     public void AddClass(string className)
@@ -106,11 +118,6 @@ public class LightElementNode : LightNode
     public void AddChild(LightNode node)
     {
         _children.Add(node);
-    }
-
-    public void RemoveChild(LightNode node)
-    {
-        _children.Remove(node);
     }
 
     public int ChildrenCount => _children.Count;
@@ -132,23 +139,8 @@ public class LightElementNode : LightNode
     {
         get
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("<").Append(_tagName);
-
-            if (_cssClasses.Count > 0)
-            {
-                sb.Append(" class=\"").Append(string.Join(" ", _cssClasses)).Append("\"");
-            }
-
-            sb.Append(">");
-
-            if (_closingType == ClosingType.Paired)
-            {
-                sb.Append(InnerHTML);
-                sb.Append("</").Append(_tagName).Append(">");
-            }
-
-            return sb.ToString();
+            string classes = string.Join(" ", _cssClasses);
+            return _state.RenderTag(_tagName, classes, InnerHTML, _closingType);
         }
     }
 }
@@ -160,20 +152,16 @@ class Program
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
         
-        CommandInvoker invoker = new CommandInvoker();
-        
-        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
-        LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
-        li.AddChild(new LightTextNode("Динамічний елемент"));
+        LightElementNode alert = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
+        alert.AddClass("alert-box");
+        alert.AddChild(new LightTextNode("Важливе повідомлення!"));
 
-        ICommand addLiCommand = new AddChildCommand(ul, li);
+        Console.WriteLine("Поточний стан: Видимий");
+        Console.WriteLine(alert.OuterHTML);
 
-        invoker.ExecuteCommand(addLiCommand);
-        Console.WriteLine("Після виконання команди:");
-        Console.WriteLine(ul.OuterHTML);
+        alert.SetState(new HiddenState());
 
-        invoker.UndoCommand();
-        Console.WriteLine("\nПісля скасування команди:");
-        Console.WriteLine(ul.OuterHTML);
+        Console.WriteLine("\nПоточний стан: Прихований");
+        Console.WriteLine(alert.OuterHTML);
     }
 }
