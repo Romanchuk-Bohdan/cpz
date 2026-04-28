@@ -2,6 +2,59 @@
 using System.Collections.Generic;
 using System.Text;
 
+public interface INodeState
+{
+    string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType);
+}
+
+public class VisibleState : INodeState
+{
+    public string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.Append("<").Append(tagName);
+
+        if (!string.IsNullOrEmpty(classes))
+        {
+            sb.Append(" class=\"").Append(classes).Append("\"");
+        }
+
+        sb.Append(">");
+
+        if (closingType == ClosingType.Paired)
+        {
+            sb.Append(innerHtml);
+            sb.Append("</").Append(tagName).Append(">");
+        }
+
+        return sb.ToString();
+    }
+}
+
+public class HiddenState : INodeState
+{
+    public string RenderTag(string tagName, string classes, string innerHtml, ClosingType closingType)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.Append("<").Append(tagName);
+
+        if (!string.IsNullOrEmpty(classes))
+        {
+            sb.Append(" class=\"").Append(classes).Append("\"");
+        }
+
+        sb.Append(" style=\"display: none;\">");
+
+        if (closingType == ClosingType.Paired)
+        {
+            sb.Append(innerHtml);
+            sb.Append("</").Append(tagName).Append(">");
+        }
+
+        return sb.ToString();
+    }
+}
+
 public enum DisplayType
 {
     Block,
@@ -40,6 +93,7 @@ public class LightElementNode : LightNode
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
     private readonly List<LightNode> _children;
+    private INodeState _state;
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
@@ -48,6 +102,12 @@ public class LightElementNode : LightNode
         _closingType = closingType;
         _cssClasses = new List<string>();
         _children = new List<LightNode>();
+        _state = new VisibleState();
+    }
+
+    public void SetState(INodeState state)
+    {
+        _state = state;
     }
 
     public void AddClass(string className)
@@ -79,23 +139,8 @@ public class LightElementNode : LightNode
     {
         get
         {
-            StringBuilder sb = new StringBuilder();
-            sb.Append("<").Append(_tagName);
-
-            if (_cssClasses.Count > 0)
-            {
-                sb.Append(" class=\"").Append(string.Join(" ", _cssClasses)).Append("\"");
-            }
-
-            sb.Append(">");
-
-            if (_closingType == ClosingType.Paired)
-            {
-                sb.Append(InnerHTML);
-                sb.Append("</").Append(_tagName).Append(">");
-            }
-
-            return sb.ToString();
+            string classes = string.Join(" ", _cssClasses);
+            return _state.RenderTag(_tagName, classes, InnerHTML, _closingType);
         }
     }
 }
@@ -107,45 +152,16 @@ class Program
         Console.OutputEncoding = Encoding.UTF8;
         Console.InputEncoding = Encoding.UTF8;
         
-        LightElementNode div = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
-        div.AddClass("container");
-        div.AddClass("dark-theme");
+        LightElementNode alert = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
+        alert.AddClass("alert-box");
+        alert.AddChild(new LightTextNode("Важливе повідомлення!"));
 
-        LightElementNode h1 = new LightElementNode("h1", DisplayType.Block, ClosingType.Paired);
-        h1.AddChild(new LightTextNode("Мова розмітки LightHTML"));
+        Console.WriteLine("Поточний стан: Видимий");
+        Console.WriteLine(alert.OuterHTML);
 
-        LightElementNode hr = new LightElementNode("hr", DisplayType.Block, ClosingType.Single);
+        alert.SetState(new HiddenState());
 
-        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
-        ul.AddClass("list-group");
-
-        for (int i = 1; i <= 3; i++)
-        {
-            LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
-            li.AddClass("list-item");
-            li.AddChild(new LightTextNode($"Елемент списку {i} "));
-
-            if (i == 2)
-            {
-                LightElementNode strong = new LightElementNode("strong", DisplayType.Inline, ClosingType.Paired);
-                strong.AddClass("highlight");
-                strong.AddChild(new LightTextNode("(Важливий)"));
-                li.AddChild(strong);
-            }
-
-            ul.AddChild(li);
-        }
-
-        div.AddChild(h1);
-        div.AddChild(hr);
-        div.AddChild(ul);
-
-        Console.WriteLine("--- InnerHTML головного контейнера ---\n");
-        Console.WriteLine(div.InnerHTML);
-        
-        Console.WriteLine("\n--- OuterHTML головного контейнера ---\n");
-        Console.WriteLine(div.OuterHTML);
-        
-        Console.WriteLine($"\nКількість прямих дочірніх елементів у div: {div.ChildrenCount}");
+        Console.WriteLine("\nПоточний стан: Прихований");
+        Console.WriteLine(alert.OuterHTML);
     }
 }
