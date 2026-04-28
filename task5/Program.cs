@@ -1,4 +1,8 @@
-﻿public interface ICommand
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+public interface ICommand
 {
     void Execute();
     void Undo();
@@ -46,13 +50,44 @@ public class CommandInvoker
     }
 }
 
+public enum DisplayType
+{
+    Block,
+    Inline
+}
+
+public enum ClosingType
+{
+    Paired,
+    Single
+}
+
+public abstract class LightNode
+{
+    public abstract string OuterHTML { get; }
+    public abstract string InnerHTML { get; }
+}
+
+public class LightTextNode : LightNode
+{
+    private readonly string _text;
+
+    public LightTextNode(string text)
+    {
+        _text = text;
+    }
+
+    public override string OuterHTML => _text;
+    public override string InnerHTML => _text;
+}
+
 public class LightElementNode : LightNode
 {
     private readonly string _tagName;
     private readonly DisplayType _displayType;
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
-    public readonly List<LightNode> _children;
+    private readonly List<LightNode> _children;
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
@@ -61,7 +96,6 @@ public class LightElementNode : LightNode
         _closingType = closingType;
         _cssClasses = new List<string>();
         _children = new List<LightNode>();
-        OnCreated();
     }
 
     public void AddClass(string className)
@@ -72,7 +106,6 @@ public class LightElementNode : LightNode
     public void AddChild(LightNode node)
     {
         _children.Add(node);
-        node.OnInserted();
     }
 
     public void RemoveChild(LightNode node)
@@ -118,14 +151,29 @@ public class LightElementNode : LightNode
             return sb.ToString();
         }
     }
+}
 
-    public override void OnCreated()
+class Program
+{
+    static void Main()
     {
-        Console.WriteLine($"Елемент {_tagName} створено.");
-    }
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.InputEncoding = Encoding.UTF8;
+        
+        CommandInvoker invoker = new CommandInvoker();
+        
+        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
+        LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
+        li.AddChild(new LightTextNode("Динамічний елемент"));
 
-    public override void OnRendered()
-    {
-        Console.WriteLine($"Елемент {_tagName} відрендерено.");
+        ICommand addLiCommand = new AddChildCommand(ul, li);
+
+        invoker.ExecuteCommand(addLiCommand);
+        Console.WriteLine("Після виконання команди:");
+        Console.WriteLine(ul.OuterHTML);
+
+        invoker.UndoCommand();
+        Console.WriteLine("\nПісля скасування команди:");
+        Console.WriteLine(ul.OuterHTML);
     }
 }
