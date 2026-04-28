@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -14,21 +15,66 @@ public enum ClosingType
     Single
 }
 
-public abstract class LightNode
+public class DepthFirstIterator : IEnumerator<LightNode>
+{
+    private readonly LightNode _root;
+    private Stack<LightNode> _stack;
+    private LightNode _current;
+
+    public DepthFirstIterator(LightNode root)
+    {
+        _root = root;
+        _stack = new Stack<LightNode>();
+        _stack.Push(_root);
+    }
+
+    public LightNode Current => _current;
+
+    object IEnumerator.Current => Current;
+
+    public bool MoveNext()
+    {
+        if (_stack.Count == 0)
+        {
+            return false;
+        }
+
+        _current = _stack.Pop();
+
+        if (_current is LightElementNode element)
+        {
+            for (int i = element.Children.Count - 1; i >= 0; i--)
+            {
+                _stack.Push(element.Children[i]);
+            }
+        }
+
+        return true;
+    }
+
+    public void Reset()
+    {
+        _stack.Clear();
+        _stack.Push(_root);
+        _current = null;
+    }
+
+    public void Dispose() { }
+}
+
+public abstract class LightNode : IEnumerable<LightNode>
 {
     public abstract string OuterHTML { get; }
     public abstract string InnerHTML { get; }
 
-    public virtual void OnCreated() { }
-    public virtual void OnInserted() { }
-    public virtual void OnRendered() { }
-
-    public string Render()
+    public IEnumerator<LightNode> GetEnumerator()
     {
-        OnCreated();
-        string result = OuterHTML;
-        OnRendered();
-        return result;
+        return new DepthFirstIterator(this);
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
     }
 }
 
@@ -39,39 +85,27 @@ public class LightTextNode : LightNode
     public LightTextNode(string text)
     {
         _text = text;
-        OnCreated();
     }
 
     public override string OuterHTML => _text;
     public override string InnerHTML => _text;
-
-    public override void OnCreated()
-    {
-        Console.WriteLine("Створено текстовий вузол.");
-    }
-
-    public override void OnInserted()
-    {
-        Console.WriteLine("Текстовий вузол додано до дерева.");
-    }
 }
 
 public class LightElementNode : LightNode
 {
-    private readonly string _tagName;
+    public string TagName { get; }
     private readonly DisplayType _displayType;
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
-    private readonly List<LightNode> _children;
+    public List<LightNode> Children { get; }
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
-        _tagName = tagName;
+        TagName = tagName;
         _displayType = displayType;
         _closingType = closingType;
         _cssClasses = new List<string>();
-        _children = new List<LightNode>();
-        OnCreated();
+        Children = new List<LightNode>();
     }
 
     public void AddClass(string className)
@@ -81,18 +115,17 @@ public class LightElementNode : LightNode
 
     public void AddChild(LightNode node)
     {
-        _children.Add(node);
-        node.OnInserted();
+        Children.Add(node);
     }
 
-    public int ChildrenCount => _children.Count;
+    public int ChildrenCount => Children.Count;
 
     public override string InnerHTML
     {
         get
         {
             StringBuilder sb = new StringBuilder();
-            foreach (var child in _children)
+            foreach (var child in Children)
             {
                 sb.Append(child.OuterHTML);
             }
@@ -105,7 +138,7 @@ public class LightElementNode : LightNode
         get
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("<").Append(_tagName);
+            sb.Append("<").Append(TagName);
 
             if (_cssClasses.Count > 0)
             {
@@ -117,21 +150,11 @@ public class LightElementNode : LightNode
             if (_closingType == ClosingType.Paired)
             {
                 sb.Append(InnerHTML);
-                sb.Append("</").Append(_tagName).Append(">");
+                sb.Append("</").Append(TagName).Append(">");
             }
 
             return sb.ToString();
         }
-    }
-
-    public override void OnCreated()
-    {
-        Console.WriteLine($"Створено елемент: {_tagName}");
-    }
-
-    public override void OnRendered()
-    {
-        Console.WriteLine($"Відрендерено елемент: {_tagName}");
     }
 }
 
@@ -143,15 +166,25 @@ class Program
         Console.InputEncoding = Encoding.UTF8;
         
         LightElementNode div = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
-        div.AddClass("container");
-
         LightElementNode h1 = new LightElementNode("h1", DisplayType.Block, ClosingType.Paired);
-        h1.AddChild(new LightTextNode("Мова розмітки LightHTML"));
+        h1.AddChild(new LightTextNode("Заголовок"));
+        LightElementNode p = new LightElementNode("p", DisplayType.Block, ClosingType.Paired);
+        p.AddChild(new LightTextNode("Текст абзацу"));
 
         div.AddChild(h1);
+        div.AddChild(p);
 
-        Console.WriteLine("\n--- Рендеринг головного контейнера ---");
-        string result = div.Render();
-        Console.WriteLine("\n" + result);
+        Console.WriteLine("Обхід дерева в глибину:");
+        foreach (var node in div)
+        {
+            if (node is LightElementNode element)
+            {
+                Console.WriteLine($"Елемент: {element.TagName}");
+            }
+            else if (node is LightTextNode textNode)
+            {
+                Console.WriteLine($"Текст: {textNode.OuterHTML}");
+            }
+        }
     }
 }
