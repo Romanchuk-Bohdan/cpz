@@ -1,36 +1,49 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-public enum DisplayType
+﻿public interface ICommand
 {
-    Block,
-    Inline
+    void Execute();
+    void Undo();
 }
 
-public enum ClosingType
+public class AddChildCommand : ICommand
 {
-    Paired,
-    Single
-}
+    private readonly LightElementNode _parent;
+    private readonly LightNode _child;
 
-public abstract class LightNode
-{
-    public abstract string OuterHTML { get; }
-    public abstract string InnerHTML { get; }
-}
-
-public class LightTextNode : LightNode
-{
-    private readonly string _text;
-
-    public LightTextNode(string text)
+    public AddChildCommand(LightElementNode parent, LightNode child)
     {
-        _text = text;
+        _parent = parent;
+        _child = child;
     }
 
-    public override string OuterHTML => _text;
-    public override string InnerHTML => _text;
+    public void Execute()
+    {
+        _parent.AddChild(_child);
+    }
+
+    public void Undo()
+    {
+        _parent.RemoveChild(_child);
+    }
+}
+
+public class CommandInvoker
+{
+    private readonly Stack<ICommand> _history = new Stack<ICommand>();
+
+    public void ExecuteCommand(ICommand command)
+    {
+        command.Execute();
+        _history.Push(command);
+    }
+
+    public void UndoCommand()
+    {
+        if (_history.Count > 0)
+        {
+            var command = _history.Pop();
+            command.Undo();
+        }
+    }
 }
 
 public class LightElementNode : LightNode
@@ -39,7 +52,7 @@ public class LightElementNode : LightNode
     private readonly DisplayType _displayType;
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
-    private readonly List<LightNode> _children;
+    public readonly List<LightNode> _children;
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
@@ -48,6 +61,7 @@ public class LightElementNode : LightNode
         _closingType = closingType;
         _cssClasses = new List<string>();
         _children = new List<LightNode>();
+        OnCreated();
     }
 
     public void AddClass(string className)
@@ -58,6 +72,12 @@ public class LightElementNode : LightNode
     public void AddChild(LightNode node)
     {
         _children.Add(node);
+        node.OnInserted();
+    }
+
+    public void RemoveChild(LightNode node)
+    {
+        _children.Remove(node);
     }
 
     public int ChildrenCount => _children.Count;
@@ -98,54 +118,14 @@ public class LightElementNode : LightNode
             return sb.ToString();
         }
     }
-}
 
-class Program
-{
-    static void Main()
+    public override void OnCreated()
     {
-        Console.OutputEncoding = Encoding.UTF8;
-        Console.InputEncoding = Encoding.UTF8;
-        
-        LightElementNode div = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
-        div.AddClass("container");
-        div.AddClass("dark-theme");
+        Console.WriteLine($"Елемент {_tagName} створено.");
+    }
 
-        LightElementNode h1 = new LightElementNode("h1", DisplayType.Block, ClosingType.Paired);
-        h1.AddChild(new LightTextNode("Мова розмітки LightHTML"));
-
-        LightElementNode hr = new LightElementNode("hr", DisplayType.Block, ClosingType.Single);
-
-        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
-        ul.AddClass("list-group");
-
-        for (int i = 1; i <= 3; i++)
-        {
-            LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
-            li.AddClass("list-item");
-            li.AddChild(new LightTextNode($"Елемент списку {i} "));
-
-            if (i == 2)
-            {
-                LightElementNode strong = new LightElementNode("strong", DisplayType.Inline, ClosingType.Paired);
-                strong.AddClass("highlight");
-                strong.AddChild(new LightTextNode("(Важливий)"));
-                li.AddChild(strong);
-            }
-
-            ul.AddChild(li);
-        }
-
-        div.AddChild(h1);
-        div.AddChild(hr);
-        div.AddChild(ul);
-
-        Console.WriteLine("--- InnerHTML головного контейнера ---\n");
-        Console.WriteLine(div.InnerHTML);
-        
-        Console.WriteLine("\n--- OuterHTML головного контейнера ---\n");
-        Console.WriteLine(div.OuterHTML);
-        
-        Console.WriteLine($"\nКількість прямих дочірніх елементів у div: {div.ChildrenCount}");
+    public override void OnRendered()
+    {
+        Console.WriteLine($"Елемент {_tagName} відрендерено.");
     }
 }
