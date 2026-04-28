@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -14,10 +15,67 @@ public enum ClosingType
     Single
 }
 
-public abstract class LightNode
+public class DepthFirstIterator : IEnumerator<LightNode>
+{
+    private readonly LightNode _root;
+    private Stack<LightNode> _stack;
+    private LightNode _current;
+
+    public DepthFirstIterator(LightNode root)
+    {
+        _root = root;
+        _stack = new Stack<LightNode>();
+        _stack.Push(_root);
+    }
+
+    public LightNode Current => _current;
+
+    object IEnumerator.Current => Current;
+
+    public bool MoveNext()
+    {
+        if (_stack.Count == 0)
+        {
+            return false;
+        }
+
+        _current = _stack.Pop();
+
+        if (_current is LightElementNode element)
+        {
+            for (int i = element.Children.Count - 1; i >= 0; i--)
+            {
+                _stack.Push(element.Children[i]);
+            }
+        }
+
+        return true;
+    }
+
+    public void Reset()
+    {
+        _stack.Clear();
+        _stack.Push(_root);
+        _current = null;
+    }
+
+    public void Dispose() { }
+}
+
+public abstract class LightNode : IEnumerable<LightNode>
 {
     public abstract string OuterHTML { get; }
     public abstract string InnerHTML { get; }
+
+    public IEnumerator<LightNode> GetEnumerator()
+    {
+        return new DepthFirstIterator(this);
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 }
 
 public class LightTextNode : LightNode
@@ -35,19 +93,19 @@ public class LightTextNode : LightNode
 
 public class LightElementNode : LightNode
 {
-    private readonly string _tagName;
+    public string TagName { get; }
     private readonly DisplayType _displayType;
     private readonly ClosingType _closingType;
     private readonly List<string> _cssClasses;
-    private readonly List<LightNode> _children;
+    public List<LightNode> Children { get; }
 
     public LightElementNode(string tagName, DisplayType displayType, ClosingType closingType)
     {
-        _tagName = tagName;
+        TagName = tagName;
         _displayType = displayType;
         _closingType = closingType;
         _cssClasses = new List<string>();
-        _children = new List<LightNode>();
+        Children = new List<LightNode>();
     }
 
     public void AddClass(string className)
@@ -57,17 +115,17 @@ public class LightElementNode : LightNode
 
     public void AddChild(LightNode node)
     {
-        _children.Add(node);
+        Children.Add(node);
     }
 
-    public int ChildrenCount => _children.Count;
+    public int ChildrenCount => Children.Count;
 
     public override string InnerHTML
     {
         get
         {
             StringBuilder sb = new StringBuilder();
-            foreach (var child in _children)
+            foreach (var child in Children)
             {
                 sb.Append(child.OuterHTML);
             }
@@ -80,7 +138,7 @@ public class LightElementNode : LightNode
         get
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("<").Append(_tagName);
+            sb.Append("<").Append(TagName);
 
             if (_cssClasses.Count > 0)
             {
@@ -92,7 +150,7 @@ public class LightElementNode : LightNode
             if (_closingType == ClosingType.Paired)
             {
                 sb.Append(InnerHTML);
-                sb.Append("</").Append(_tagName).Append(">");
+                sb.Append("</").Append(TagName).Append(">");
             }
 
             return sb.ToString();
@@ -108,44 +166,25 @@ class Program
         Console.InputEncoding = Encoding.UTF8;
         
         LightElementNode div = new LightElementNode("div", DisplayType.Block, ClosingType.Paired);
-        div.AddClass("container");
-        div.AddClass("dark-theme");
-
         LightElementNode h1 = new LightElementNode("h1", DisplayType.Block, ClosingType.Paired);
-        h1.AddChild(new LightTextNode("Мова розмітки LightHTML"));
-
-        LightElementNode hr = new LightElementNode("hr", DisplayType.Block, ClosingType.Single);
-
-        LightElementNode ul = new LightElementNode("ul", DisplayType.Block, ClosingType.Paired);
-        ul.AddClass("list-group");
-
-        for (int i = 1; i <= 3; i++)
-        {
-            LightElementNode li = new LightElementNode("li", DisplayType.Block, ClosingType.Paired);
-            li.AddClass("list-item");
-            li.AddChild(new LightTextNode($"Елемент списку {i} "));
-
-            if (i == 2)
-            {
-                LightElementNode strong = new LightElementNode("strong", DisplayType.Inline, ClosingType.Paired);
-                strong.AddClass("highlight");
-                strong.AddChild(new LightTextNode("(Важливий)"));
-                li.AddChild(strong);
-            }
-
-            ul.AddChild(li);
-        }
+        h1.AddChild(new LightTextNode("Заголовок"));
+        LightElementNode p = new LightElementNode("p", DisplayType.Block, ClosingType.Paired);
+        p.AddChild(new LightTextNode("Текст абзацу"));
 
         div.AddChild(h1);
-        div.AddChild(hr);
-        div.AddChild(ul);
+        div.AddChild(p);
 
-        Console.WriteLine("--- InnerHTML головного контейнера ---\n");
-        Console.WriteLine(div.InnerHTML);
-        
-        Console.WriteLine("\n--- OuterHTML головного контейнера ---\n");
-        Console.WriteLine(div.OuterHTML);
-        
-        Console.WriteLine($"\nКількість прямих дочірніх елементів у div: {div.ChildrenCount}");
+        Console.WriteLine("Обхід дерева в глибину:");
+        foreach (var node in div)
+        {
+            if (node is LightElementNode element)
+            {
+                Console.WriteLine($"Елемент: {element.TagName}");
+            }
+            else if (node is LightTextNode textNode)
+            {
+                Console.WriteLine($"Текст: {textNode.OuterHTML}");
+            }
+        }
     }
 }
